@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: databases.database.hauke.cloud
+  name: databases.iot.hauke.cloud
 spec:
-  group: database.hauke.cloud
+  group: iot.hauke.cloud
   names:
     kind: Database
     listKind: DatabaseList
@@ -248,6 +248,31 @@ spec:
                   - type
                   type: object
                 type: array
+              connectedServices:
+                description: |-
+                  ConnectedServices lists the services currently connected to this database
+                  Services register themselves here to indicate active usage
+                items:
+                  description: ConnectedService represents a service that is actively
+                    connected to the database
+                  properties:
+                    lastSeenTime:
+                      description: LastSeenTime is when this service last updated
+                        its connection status
+                      format: date-time
+                      type: string
+                    name:
+                      description: Name of the service (e.g., "mqtt-sensor-exporter",
+                        "irrigator")
+                      type: string
+                    namespace:
+                      description: Namespace where the service is running
+                      type: string
+                  required:
+                  - name
+                  - namespace
+                  type: object
+                type: array
               connectionState:
                 description: ConnectionState indicates the current database connection
                   state
@@ -276,6 +301,12 @@ spec:
                 description: Message provides additional information about the connection
                   state
                 type: string
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the generation observed by the database-manager controller
+                  Used to avoid unnecessary reconciliation on status-only updates
+                format: int64
+                type: integer
               pendingBatch:
                 description: PendingBatch is the number of measurements waiting to
                   be written

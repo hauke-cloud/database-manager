@@ -30,7 +30,9 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./..." output:rbac:artifacts:config=config/rbac
-	@echo "Note: Database CRDs are managed by database-api repository"
+	@echo "Generating CRDs from kubernetes-iot-api..."
+	cd ../kubernetes-iot-api && $(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=../database-manager/config/crd
+	@echo "Note: Database CRDs are defined in github.com/hauke-cloud/kubernetes-iot-api"
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.

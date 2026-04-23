@@ -4,7 +4,7 @@ go 1.25.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/hauke-cloud/database-api v0.0.2
+	github.com/hauke-cloud/kubernetes-iot-api v0.0.1
 	github.com/jackc/pgx/v5 v5.6.0
 	go.uber.org/zap v1.27.0
 	gorm.io/driver/postgres v1.6.0

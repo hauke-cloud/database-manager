@@ -31,7 +31,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	databasev1alpha1 "github.com/hauke-cloud/database-api/api/v1alpha1"
+	iotv1alpha1 "github.com/hauke-cloud/kubernetes-iot-api/api/v1alpha1"
 	"github.com/hauke-cloud/database-manager/internal/controller"
 	"github.com/hauke-cloud/database-manager/internal/database"
 )
@@ -43,7 +43,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(databasev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(iotv1alpha1.AddToScheme(scheme))
 }
 
 func main() {

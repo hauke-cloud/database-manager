@@ -27,7 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	databasev1alpha1 "github.com/hauke-cloud/database-api/api/v1alpha1"
+	iotv1alpha1 "github.com/hauke-cloud/kubernetes-iot-api/api/v1alpha1"
 	"github.com/hauke-cloud/database-manager/internal/database"
 )
 
@@ -52,7 +52,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		zap.String("name", req.Name))
 
 	// Fetch the Database instance
-	db := &databasev1alpha1.Database{}
+	db := &iotv1alpha1.Database{}
 	if err := r.Get(ctx, req.NamespacedName, db); err != nil {
 		if errors.IsNotFound(err) {
 			// Database was deleted - disconnect
@@ -119,6 +119,6 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&databasev1alpha1.Database{}).
+		For(&iotv1alpha1.Database{}).
 		Complete(r)
 }
