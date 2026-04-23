@@ -1,0 +1,40 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+testbin/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+coverage.out
+
+# Kubernetes Generated files
+*.crds.yaml
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+.vscode/
+
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+docs/
+
+# Development files
+Makefile
+hack/
