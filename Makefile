@@ -27,12 +27,15 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
+.PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	cd ../database-api && $(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=../database-manager/config/crd
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./..." output:rbac:artifacts:config=config/rbac
+	@echo "Note: Database CRDs are managed by database-api repository"
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	cd ../database-api && $(CONTROLLER_GEN) object:headerFile=../database-manager/hack/boilerplate.go.txt paths="./..."
+	$(CONTROLLER_GEN) object:headerFile=hack/boilerplate.go.txt paths="./..."
+	@echo "Note: Database API types are imported from github.com/hauke-cloud/database-api"
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
