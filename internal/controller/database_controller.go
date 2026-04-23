@@ -64,9 +64,18 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	// Skip reconciliation if generation hasn't changed (status-only update)
+	// ObservedGeneration is set by us after successful reconciliation
+	if db.Status.ObservedGeneration != nil && *db.Status.ObservedGeneration == db.Generation {
+		log.Debug("Skipping reconciliation - generation unchanged (status-only update)",
+			zap.Int64("generation", db.Generation))
+		return ctrl.Result{}, nil
+	}
+
 	log.Info("Reconciling Database",
 		zap.String("database", db.Name),
 		zap.String("host", db.Spec.Host),
+		zap.Int64("generation", db.Generation),
 		zap.Strings("supportedSensorTypes", db.Spec.SupportedSensorTypes))
 
 	// Connect to database
@@ -76,6 +85,8 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		// Update status to error
 		db.Status.ConnectionState = "Error"
 		db.Status.Message = err.Error()
+		observedGen := db.Generation
+		db.Status.ObservedGeneration = &observedGen
 		if statusErr := r.Status().Update(ctx, db); statusErr != nil {
 			log.Error("Failed to update status", zap.Error(statusErr))
 		}
@@ -89,6 +100,8 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	db.Status.Message = "Successfully connected to database"
 	now := metav1.NewTime(time.Now())
 	db.Status.LastConnectedTime = &now
+	observedGen := db.Generation
+	db.Status.ObservedGeneration = &observedGen
 
 	if err := r.Status().Update(ctx, db); err != nil {
 		log.Error("Failed to update status", zap.Error(err))
