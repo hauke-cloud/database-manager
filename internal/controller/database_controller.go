@@ -27,8 +27,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	iotv1alpha1 "github.com/hauke-cloud/kubernetes-iot-api/api/v1alpha1"
 	"github.com/hauke-cloud/database-manager/internal/database"
+	iotv1alpha1 "github.com/hauke-cloud/kubernetes-iot-api/api/v1alpha1"
 )
 
 // DatabaseReconciler reconciles a Database object
