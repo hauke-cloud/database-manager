@@ -27,17 +27,20 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-.PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./..." output:rbac:artifacts:config=config/rbac
-	@echo "Generating CRDs from kubernetes-iot-api..."
-	cd ../kubernetes-iot-api && $(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=../database-manager/config/crd
-	@echo "Note: Database CRDs are defined in github.com/hauke-cloud/kubernetes-iot-api"
+	@echo "Generating CRDs from kubernetes-iot-api Go module..."
+	@rm -f config/crd/iot.hauke.cloud_*.yaml
+	@mkdir -p config/crd/tmp
+	$(CONTROLLER_GEN) crd paths="github.com/hauke-cloud/kubernetes-iot-api/api/v1alpha1" output:crd:artifacts:config=config/crd/tmp
+	@echo "Keeping only Database CRD..."
+	@mv config/crd/tmp/iot.hauke.cloud_databases.yaml config/crd/ 2>/dev/null || true
+	@rm -rf config/crd/tmp
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile=hack/boilerplate.go.txt paths="./..."
-	@echo "Note: Database API types are imported from github.com/hauke-cloud/database-api"
+	@echo "Note: Database API types are imported from github.com/hauke-cloud/kubernetes-iot-api"
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
