@@ -121,7 +121,7 @@ func main() {
 
 	// Install/Update CRDs before starting the controller
 	ctx := context.Background()
-	if err := crds.Install(ctx, mgr.GetClient(), zapLog); err != nil {
+	if err := crds.Install(ctx, zapLog); err != nil {
 		setupLog.Error(err, "failed to install CRDs")
 		os.Exit(1)
 	}
