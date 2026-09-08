@@ -1,206 +1,224 @@
-
-
+<!-- llm-readme-management spec=1 commit=be2690bad0829ff2bdbc7bed29e7eda67c1116ee template=golang model=qwen3.8-27b-q4 digest=b3d4b07f2e19 generated=2026-09-08T13:37:24Z -->
 <a href="https://hauke.cloud" target="_blank"><img src="https://img.shields.io/badge/home-hauke.cloud-brightgreen" alt="hauke.cloud" style="display: block;" /></a>
 <a href="https://github.com/hauke-cloud" target="_blank"><img src="https://img.shields.io/badge/github-hauke.cloud-blue" alt="hauke.cloud Github Organisation" style="display: block;" /></a>
+<a href="https://github.com/hauke-cloud/llm-readme-management" target="_blank"><img src="https://img.shields.io/badge/template-golang-orange" alt="Repository type - golang" style="display: block;" /></a>
+
 
 # Database Manager
 
+
 <img src="https://raw.githubusercontent.com/hauke-cloud/.github/main/resources/img/organisation-logo-small.png" alt="hauke.cloud logo" width="109" height="123" align="right">
 
-A Kubernetes operator that manages PostgreSQL/TimescaleDB database connections for sensor measurement storage. This operator watches `Database` custom resources and establishes connections to PostgreSQL databases, providing a centralized way to manage database connectivity across multiple applications.
 
-## Overview
+<llm header hint="Name the Go module path and say whether this is a service, a CLI or a library.">
 
-The Database Manager operator is part of the hauke.cloud IoT infrastructure and works alongside other components like mqtt-sensor-exporter. It provides:
+This is a Go service (module `github.com/hauke-cloud/database-manager`) that runs as a Kubernetes operator in a hauke.cloud IoT cluster. It watches `Database` custom resources and manages PostgreSQL/TimescaleDB connection pools for storing IoT sensor measurements. It is for cluster operators who need to provision and monitor the database connections backing their sensor infrastructure.
 
-- **Declarative Database Configuration**: Define database connections using Kubernetes CRDs
-- **Automatic Connection Management**: Establishes and maintains database connections
-- **Secure Credentials**: Store database credentials in Kubernetes Secrets
-- **Multi-Database Support**: Connect to multiple databases with different configurations
-- **TLS/SSL Support**: Full support for encrypted connections with client certificates
-- **Sensor Type Routing**: Route different sensor types to different databases
-- **Connection Pooling**: Configurable connection pooling for performance
-- **Status Monitoring**: Track connection status and measurement statistics
+</llm>
 
-## Architecture
 
-The operator uses the shared `database-api` library for CRD definitions, allowing multiple applications to consume the same Database resources without importing controller dependencies.
+## :book: Description
 
-### Components
+<llm description>
 
-- **database-api**: Shared Go library containing the Database CRD types
-- **database-manager**: Controller that watches Database resources and manages connections
-- **Applications** (e.g., mqtt-sensor-exporter): Import database-api and use Database resources
+`database-manager` is a Kubernetes operator that manages PostgreSQL and TimescaleDB connections for storing IoT sensor measurements. It watches `Database` custom resources (group `iot.hauke.cloud`, version `v1alpha1`) and, for each one, opens a GORM connection pool to the referenced database, auto-migrates the tables for the sensor types listed in the resource, and reports connection status back to the CR's status subresource.
 
-## Getting Started
+The operator runs as a single Deployment inside a hauke.cloud IoT cluster. It self-installs its CRD at startup, reads credentials from Kubernetes Secrets, and routes incoming measurement payloads to the first connected database whose `supportedSensorTypes` includes the relevant sensor type.
 
-### Prerequisites
+- Reconciles `Database` CRs: builds a TLS-aware DSN from the spec and a referenced password Secret, then opens a pooled GORM connection.
+- Auto-migrates four measurement tables on connect: `moisture_measurements`, `valve_measurements`, `water_level_measurements`, `room_measurements`.
+- Routes sensor payloads via `StoreMeasurement` to the matching database handler.
+- Reports `Connected` or `Error` state (with a 30 s requeue) in the CR status; closes the connection on resource deletion.
 
-- Kubernetes cluster (1.28+)
-- kubectl configured
-- PostgreSQL or TimescaleDB instance
+The reusable CRD types live in the external `github.com/hauke-cloud/kubernetes-iot-api` module; everything in this repository under `internal/` is non-importable.
 
-### Installation
+</llm>
 
-1. **Install CRDs:**
+
+## :clipboard: Requirements
+
+<llm requirements hint="Give the Go version from the go directive in go.mod. Mention Docker only if the repository actually builds an image.">
+
+- Go 1.25.3 (pinned in `go.mod`).
+- `controller-gen` v0.20.1, installed automatically by `make controller-gen`.
+- A reachable Kubernetes cluster with a valid kubeconfig. The operator requires RBAC for `iot.hauke.cloud/databases` (including `/status` and `/finalizers`), `secrets` read, and `apiextensions.k8s.io/customresourcedefinitions` create/get/list/update.
+- A PostgreSQL or TimescaleDB instance, with a Kubernetes Secret in the same namespace as the `Database` CR holding the password under key `password`; optional CA and client-certificate Secrets for mTLS.
+- Docker (or another container runtime) for `make docker-build`.
+- `kubectl` for `make install` and `make uninstall`.
+- Helm for the OCI chart install path.
+- `pre-commit` for contributors.
+
+</llm>
+
+
+## 🚀 Getting started
+
+<llm getting_started hint="Cover go build, go run and go test with the real package paths. If a Makefile or Taskfile exists, prefer its targets over raw go commands.">
+
+1. Clone the repository and enter the project directory.
 
 ```bash
-kubectl apply -f config/crd/database.hauke.cloud_databases.yaml
+git clone https://github.com/hauke-cloud/database-manager.git
+cd database-manager
 ```
 
-2. **Deploy the operator:**
+2. Build the operator binary into `bin/manager` (this also fetches Go module dependencies).
 
-Development mode:
+```bash
+make build
+```
+
+3. Run the operator against a Kubernetes cluster; a valid kubeconfig must be available in your environment.
+
 ```bash
 make run
 ```
 
-Production deployment:
+4. Run the full test suite with coverage.
+
 ```bash
-make docker-build docker-push IMG=<your-registry>/database-manager:tag
-kubectl apply -k config/manager
+make test
 ```
 
-### Quick Start
+</llm>
 
-1. **Create database credentials secret:**
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: timescaledb-credentials
-  namespace: default
-type: Opaque
-stringData:
-  password: "your-database-password"
+## :airplane: Usage
+
+<llm usage hint="For a library, show a small import-and-call example using real exported identifiers. For a service or CLI, show how it is started and the flags or subcommands it accepts.">
+
+Once the operator is running in your cluster, you interact with it by creating `Database` custom resources and checking their status.
+
+**Deploy the operator**
+
+The Helm chart is the supported deployment path. It creates the Deployment, ServiceAccount, RBAC, and leader-election resources:
+
+```bash
+helm install database-manager \
+  oci://ghcr.io/hauke-cloud/charts/database-manager \
+  --version 0.1.0 \
+  --namespace database-manager-system \
+  --create-namespace
 ```
 
-2. **Create a Database resource:**
+The operator self-installs the `databases.iot.hauke.cloud` CRD at startup, so no separate `kubectl apply` is needed.
+
+**Create a Database resource**
+
+Point the operator at a PostgreSQL or TimescaleDB instance. The password must live in a Kubernetes Secret (key `password`) in the same namespace as the resource:
 
 ```yaml
-apiVersion: database.hauke.cloud/v1alpha1
+apiVersion: iot.hauke.cloud/v1alpha1
 kind: Database
 metadata:
-  name: moisture-db
-  namespace: default
+  name: sensor-db
+  namespace: database-manager-system
 spec:
-  host: "timescaledb.default.svc.cluster.local"
+  host: postgres.example.internal
+  database: iot
+  username: iot_writer
   port: 5432
-  database: "sensors"
-  username: "sensor_writer"
   passwordSecretRef:
-    name: timescaledb-credentials
-  sslMode: "require"
+    name: sensor-db-password
+  sslMode: require
   supportedSensorTypes:
-    - "moisture"
-    - "water_level"
+    - moisture
+    - water_level
+    - valve
+    - room
   maxConnections: 10
   minConnections: 2
-  batchSize: 100
-  batchTimeout: 10
 ```
 
-3. **Check connection status:**
+On the first successful reconcile the operator opens a GORM connection pool, runs `AutoMigrate` for each supported sensor type, and sets `status.connectionState` to `Connected`.
+
+**Check connection status**
 
 ```bash
-kubectl get databases
+kubectl get databases -n database-manager-system
 ```
 
-## Configuration
+The short names `db` and `dbs` also work. If the connection fails the status shows `Error` with the message and the reconciler requeues after 30 seconds.
 
-### Database Spec
+</llm>
 
-- **host**: Database hostname or IP address
-- **port**: Database port (default: 5432)
-- **database**: Database name
-- **username**: Database username
-- **passwordSecretRef**: Reference to Secret containing password
-- **clientCertSecretRef**: Reference to Secret containing client certificate (for mutual TLS)
-- **sslMode**: SSL mode (disable, require, verify-ca, verify-full)
-- **caSecretRef**: Reference to Secret containing CA certificate
-- **supportedSensorTypes**: List of sensor types this database handles
-- **maxConnections**: Maximum connection pool size
-- **minConnections**: Minimum connection pool size
-- **batchSize**: Number of measurements to batch before writing
-- **batchTimeout**: Maximum time to wait before writing partial batch (seconds)
 
-## Integration
+## :wrench: Configuration
 
-### Using database-api in Your Application
+<llm configuration hint="Environment variables and CLI flags, taken from the flag definitions or the config struct.">
 
-To use Database resources in your Go application:
+The operator binary (`cmd/main.go`) accepts four CLI flags:
 
-1. **Import the shared API:**
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--metrics-bind-address` | `:8080` | Prometheus metrics listen address |
+| `--health-probe-bind-address` | `:8081` | Liveness/readiness probe address |
+| `--leader-elect` | `false` | Enable leader election (ID `database-manager.hauke.cloud`) |
+| `--log-level` | `info` | Zap level: `debug`, `info`, `warn`, `error` |
 
-```go
-import databasev1alpha1 "github.com/hauke-cloud/database-api/api/v1alpha1"
-```
+Each `Database` CR (`databases.iot.hauke.cloud/v1alpha1`) carries the connection parameters. The full schema is in `config/crd/iot.hauke.cloud_databases.yaml`; the table below lists the fields the reconciler reads at connect time. `clientCertSecretRef`, `caSecretRef`, `batchSize`, and `batchTimeout` are also defined in the CRD but are omitted here (the last two have no implementation yet).
 
-2. **Add to your go.mod:**
+| Field | Type | Default | Required | Description |
+|-------|------|---------|----------|-------------|
+| `host` | string | — | yes | PostgreSQL/TimescaleDB host |
+| `database` | string | — | yes | Database name |
+| `username` | string | — | yes | DB user |
+| `port` | int | `5432` | no | DB port |
+| `passwordSecretRef` | object | — | no | Secret ref (key `password`) holding the DB password |
+| `sslMode` | enum | `require` | no | `disable`, `require`, `verify-ca`, `verify-full` |
+| `supportedSensorTypes` | []string | — | yes (minItems 1) | Sensor types this database serves |
+| `maxConnections` | int | `10` | no | Pool max open conns (max 100) |
+| `minConnections` | int | `2` | no | Pool max idle conns (max 10) |
 
-```go
-require (
-    github.com/hauke-cloud/database-api v0.0.0
-)
+The Helm chart (`deployments/helm/database-manager/values.yaml`) exposes `replicaCount` (1), `image.*`, `operator.leaderElection` (true), `operator.metrics.port` (8080), `operator.health.port` (8081), `rbac.create` (true), `logging.level` (info), and `logging.format` (json). See `values.yaml` for the remaining keys (`resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`).
 
-replace github.com/hauke-cloud/database-api => ../database-api  // for local development
-```
+</llm>
 
-3. **Register the scheme:**
 
-```go
-utilruntime.Must(databasev1alpha1.AddToScheme(scheme))
-```
+## :hammer: Development
 
-4. **Watch Database resources:**
+<llm development hint="Include go test, go vet and gofmt only where the CI workflows actually run them.">
 
-```go
-func (r *YourReconciler) SetupWithManager(mgr ctrl.Manager) error {
-    return ctrl.NewControllerManagedBy(mgr).
-        Watches(&databasev1alpha1.Database{}, handler.EnqueueRequestsFromMapFunc(r.findRelatedResources)).
-        Complete(r)
-}
-```
-
-## Development
-
-### Building
+Before pushing, regenerate the checked-in generated files so CI does not reject your diff:
 
 ```bash
-# Generate manifests and code
-make manifests generate
-
-# Build binary
-make build
-
-# Run locally
-make run
+make generate
+make manifests
 ```
 
-### Project Structure
+`make generate` runs controller-gen deepcopy for `./...`; `make manifests` regenerates the CRD YAML and RBAC from the `kubernetes-iot-api` types. Both are pinned to controller-gen v0.20.1.
 
-```
-database-manager/
-├── cmd/main.go              # Main entry point
-├── internal/
-│   ├── controller/          # Database controller
-│   └── database/            # Database connection management
-│       ├── manager.go       # Connection manager
-│       ├── models.go        # GORM models
-│       └── *_handler.go     # Sensor-specific handlers
-├── config/
-│   ├── crd/                 # Generated CRDs (from database-api)
-│   └── manager/             # Deployment manifests
-└── Makefile
+Run the full test suite locally:
 
-database-api/                # Shared API library
-└── api/v1alpha1/
-    ├── groupversion_info.go
-    ├── database_types.go
-    └── zz_generated.deepcopy.go
+```bash
+make test
 ```
 
+This chains `manifests generate fmt vet` and then `go test ./... -coverprofile cover.out`. CI additionally runs the tests with the race detector:
+
+```bash
+go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+```
+
+For formatting and static analysis:
+
+```bash
+make fmt
+make vet
+```
+
+CI's lint step is `gofmt -s -l .` followed by `go vet ./...`. Note that `gofmt -s -l` only *lists* unformatted files; it does not fail the build on its own, but `go vet` will.
+
+Install the pre-commit hooks (gitleaks and basic checks) before your first commit:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+PR titles are validated by a workflow: the type must be one of `fix`, `feat`, `docs`, `ci`, or `chore`, and the subject must start with an uppercase letter.
+
+</llm>
 
 
 ## 📄 License
@@ -219,13 +237,3 @@ To become a contributor, please check out the [CONTRIBUTING](CONTRIBUTING.md) fi
 
 For any inquiries or support requests, please open an issue in this
 repository or contact us at [contact@hauke.cloud](mailto:contact@hauke.cloud).
-
-
-## Best Practices
-
-This architecture follows Kubernetes ecosystem best practices:
-
-- **Separation of Concerns**: API types are separate from controller logic, similar to how `k8s.io/api` is separate from `k8s.io/kubernetes`.
-- **Shared Library Pattern**: Multiple applications can import `database-api` without pulling in controller dependencies, keeping their binaries lean.
-- **Declarative Configuration**: Database connections are managed declaratively through Kubernetes resources.
-- **GitOps Ready**: All configuration can be version-controlled and deployed via GitOps tools like ArgoCD or Flux.
